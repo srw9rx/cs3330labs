@@ -1,0 +1,18 @@
+Size       Cycles/Element for sum_C: simple C compiled on this machine with settings in Makefile
+1048576       0.96
+
+Size       Cycles/Element for sum_simple: simple ASM implementation
+1048576       0.96
+
+Size       Cycles/Element for sum_unrolled2: with unrolling to 2 at once
+1048576       0.70
+
+Size       Cycles/Element for sum_unrolled4: with unrolling to 4 at once
+1048576       0.75
+
+Size       Cycles/Element for sum_multiple_accum: with unrolling to 4 at once and multiple accums
+1048576       0.45
+
+Size       Cycles/Element for sum_multiple_accum_C: C code for multiple accumulators
+1048576       0.38
+
