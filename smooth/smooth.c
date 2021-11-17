@@ -47,6 +47,7 @@ static void initialize_pixel_sum(pixel_sum *sum)
  */
 static void accumulate_sum(pixel_sum *sum, pixel p) 
 {
+    //unsigned short pixels[4] = {(unsigned short)p.red, (unsigned short)p.green, (unsigned short)p.blue, (unsigned short)p.alpha};
     sum->red += (int) p.red;
     sum->green += (int) p.green;
     sum->blue += (int) p.blue;
@@ -113,6 +114,7 @@ void another_smooth(int dim, pixel *src, pixel *dst)
 
 char step1_descr[] = "step1: deal w edge cases";
 void step1(int dim, pixel *src, pixel *dst) {
+    unsigned short sum[4] = {0,0,0,0};
     for (int i = 1; i < (dim-1); i++) {
         for (int j = 1; j < (dim-1); j++) {
             pixel_sum sum;
@@ -128,10 +130,52 @@ void step1(int dim, pixel *src, pixel *dst) {
             accumulate_sum(&sum, src[RIDX(i, j-1, dim)]);
             accumulate_sum(&sum, src[RIDX(i, j, dim)]);
 
-        current_pixel.red = (unsigned short) (sum.red/9);
-        current_pixel.green = (unsigned short) (sum.green/9);
-        current_pixel.blue = (unsigned short) (sum.blue/9);
-        current_pixel.alpha = (unsigned short) (sum.alpha/9);
+            current_pixel.red = (unsigned short) (sum.red/9);
+            current_pixel.green = (unsigned short) (sum.green/9);
+            current_pixel.blue = (unsigned short) (sum.blue/9);
+            current_pixel.alpha = (unsigned short) (sum.alpha/9);
+            dst[RIDX(i, j, dim)] = current_pixel;
+        }
+    }
+    for (int j = 0; j<dim; ++j) {
+        dst[RIDX(0,j, dim)] = avg(dim, 0, j, src); 
+        dst[RIDX(dim-1,j, dim)] = avg(dim, dim-1, j, src);
+        dst[RIDX(j,0, dim)] = avg(dim, j, 0, src); 
+        dst[RIDX(j,dim-1, dim)] = avg(dim, j, dim-1, src);         
+    }
+}
+char step3_descr[] = "step1: deal w edge cases";
+void step3(int dim, pixel *src, pixel *dst) {
+    sum->red = sum->green = sum->blue = sum->alpha = 0;
+    for (int i = 1; i < (dim-1); i++) {
+        for (int j = 1; j < (dim-1); j++) {
+            unsigned int sumar[4];
+            pixel_sum sum;
+            initialize_pixel_sum(&sum);
+            pixel current_pixel;
+            current_pixel = src[RIDX(i-1, j-1, dim)]);
+            unsigned short pixels[4] = {current_pixel->red,current_pixel->green,current_pixel->blue,current_pixel->alpha};
+            __m128i pixel_sum //perform the vector add then move onto the next pixel
+            accumulate_sum(&sum, src[RIDX(i-1, j, dim)]);
+            accumulate_sum(&sum, src[RIDX(i-1, j+1, dim)]);
+            accumulate_sum(&sum, src[RIDX(i+1, j-1, dim)]);
+            accumulate_sum(&sum, src[RIDX(i+1, j, dim)]);
+            accumulate_sum(&sum, src[RIDX(i+1, j+1, dim)]);
+            accumulate_sum(&sum, src[RIDX(i, j+1, dim)]);
+            accumulate_sum(&sum, src[RIDX(i, j-1, dim)]);
+            accumulate_sum(&sum, src[RIDX(i, j, dim)]);
+            
+            //extract the sum from the vector operation
+            sum->red, sum->green, sum->blue, sum->alpha += (int) p.red;
+            sum->green += (int) p.green;
+            sum->blue += (int) p.blue;
+            sum->alpha += (int) p.alpha;
+            initialize_pixel_sum(&sum);
+
+            current_pixel.red = (unsigned short) (sum.red/9);
+            current_pixel.green = (unsigned short) (sum.green/9);
+            current_pixel.blue = (unsigned short) (sum.blue/9);
+            current_pixel.alpha = (unsigned short) (sum.alpha/9);
             dst[RIDX(i, j, dim)] = current_pixel;
         }
     }
@@ -154,4 +198,5 @@ void register_smooth_functions() {
     add_smooth_function(&naive_smooth, naive_smooth_descr);
     add_smooth_function(&another_smooth, another_smooth_descr);
     add_smooth_function(&step1, step1_descr);
+    add_smooth_function(&step3, step3_descr);
 }
