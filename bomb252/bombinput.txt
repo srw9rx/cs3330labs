@@ -1,0 +1,5 @@
+Simplicity does not precede complexity, but follows it.
+0 2 5 9 14 20
+0 5
+2 13
+5 115
