@@ -112,9 +112,47 @@ void another_smooth(int dim, pixel *src, pixel *dst)
     naive_smooth(dim, src, dst);
 }
 
-char step1_descr[] = "step1: deal w edge cases";
+char step3_descr[] = "step3: add vector for each pixel";
+void step3(int dim, pixel *src, pixel *dst) {
+    //unsigned short sum[4] = {0,0,0,0};
+    for (int i = 1; i < (dim-1); i++) {
+        for (int j = 1; j < (dim-1); j++) {
+            pixel current_pixel;
+            //__m256i pixelsums = _mm256_setzero_si256(); //declare the partial sums as a vector
+            //__m128i pixelsums = _mm_loadu_si128((__m128i*) &sum);
+            __m128i pixel1 = _mm_setr_epi8(src[RIDX(i-1, j-1, dim)].red,src[RIDX(i-1, j-1, dim)].green,src[RIDX(i-1, j-1, dim)].blue,src[RIDX(i-1, j-1, dim)].alpha,src[RIDX(i-1, j, dim)].red,src[RIDX(i-1, j, dim)].green,src[RIDX(i-1, j, dim)].blue,src[RIDX(i-1, j, dim)].alpha, src[RIDX(i-1, j+1, dim)].red, src[RIDX(i-1, j+1, dim)].green,src[RIDX(i-1, j+1, dim)].blue,src[RIDX(i-1, j+1, dim)].alpha,src[RIDX(i, j-1, dim)].red,src[RIDX(i, j-1, dim)].green,src[RIDX(i, j-1, dim)].blue,src[RIDX(i, j-1, dim)].alpha);
+            __m128i pixel2 = _mm_setr_epi8(src[RIDX(i, j+1, dim)].red,src[RIDX(i, j+1, dim)].green,src[RIDX(i, j+1, dim)].blue,src[RIDX(i, j+1, dim)].alpha,src[RIDX(i, j, dim)].red,src[RIDX(i, j, dim)].green,src[RIDX(i, j, dim)].blue,src[RIDX(i, j, dim)].alpha,src[RIDX(i+1, j+1, dim)].red,src[RIDX(i+1, j+1, dim)].green,src[RIDX(i+1, j+1, dim)].blue,src[RIDX(i+1, j+1, dim)].alpha,src[RIDX(i+1, j-1, dim)].red,src[RIDX(i+1, j-1, dim)].green,src[RIDX(i+1, j-1, dim)].blue,src[RIDX(i+1, j-1, dim)].alpha);
+            __m256i add1 = _mm256_cvtepu8_epi16(pixel1);
+            __m256i add2 = _mm256_cvtepu8_epi16(pixel2);
+            add2 = _mm256_add_epi16(add2, add1);
+            //pixelsums = _mm256_add_epi16(pixelsums, add2);
+
+
+            unsigned short extracted_sum[16]; //declare extraction array
+            _mm256_storeu_si256((__m256i* ) &extracted_sum, add2); //extract
+            extracted_sum[0] = extracted_sum[0]+extracted_sum[4]+extracted_sum[8]+extracted_sum[12]+src[RIDX(i+1, j, dim)].red;
+            extracted_sum[1] = extracted_sum[1]+extracted_sum[5]+extracted_sum[9]+extracted_sum[13]+src[RIDX(i+1, j, dim)].green;
+            extracted_sum[2] = extracted_sum[2]+extracted_sum[6]+extracted_sum[10]+extracted_sum[14]+src[RIDX(i+1, j, dim)].blue;
+            extracted_sum[3] = extracted_sum[3]+extracted_sum[7]+extracted_sum[11]+extracted_sum[15]+src[RIDX(i+1, j, dim)].alpha;
+            current_pixel = src[RIDX(i, j, dim)];
+            current_pixel.red = (extracted_sum[0]/9);
+            current_pixel.green = (extracted_sum[1]/9);
+            current_pixel.blue = (extracted_sum[2]/9);
+            current_pixel.alpha = (extracted_sum[3]/9);
+            dst[RIDX(i, j, dim)] = current_pixel;
+        }
+    }
+    //deal with leftovers
+    for (int j = 0; j<dim; ++j) {
+        dst[RIDX(0,j, dim)] = avg(dim, 0, j, src); 
+        dst[RIDX(dim-1,j, dim)] = avg(dim, dim-1, j, src);
+        dst[RIDX(j,0, dim)] = avg(dim, j, 0, src); 
+        dst[RIDX(j,dim-1, dim)] = avg(dim, j, dim-1, src);         
+    }
+}
+char step1_descr[] = "step2: unroll";
 void step1(int dim, pixel *src, pixel *dst) {
-    unsigned short sum[4] = {0,0,0,0};
+    //unsigned short sum[4] = {0,0,0,0};
     for (int i = 1; i < (dim-1); i++) {
         for (int j = 1; j < (dim-1); j++) {
             pixel_sum sum;
@@ -137,6 +175,7 @@ void step1(int dim, pixel *src, pixel *dst) {
             dst[RIDX(i, j, dim)] = current_pixel;
         }
     }
+    //still have to deal with edge cases
     for (int j = 0; j<dim; ++j) {
         dst[RIDX(0,j, dim)] = avg(dim, 0, j, src); 
         dst[RIDX(dim-1,j, dim)] = avg(dim, dim-1, j, src);
@@ -144,41 +183,75 @@ void step1(int dim, pixel *src, pixel *dst) {
         dst[RIDX(j,dim-1, dim)] = avg(dim, j, dim-1, src);         
     }
 }
-char step3_descr[] = "step1: deal w edge cases";
-void step3(int dim, pixel *src, pixel *dst) {
-    sum->red = sum->green = sum->blue = sum->alpha = 0;
+char step4a_descr[] = "step4a: add 3 at a time";
+void step4a(int dim, pixel *src, pixel *dst) {
+    //unsigned short sum[4] = {0,0,0,0};
     for (int i = 1; i < (dim-1); i++) {
-        for (int j = 1; j < (dim-1); j++) {
-            unsigned int sumar[4];
-            pixel_sum sum;
-            initialize_pixel_sum(&sum);
-            pixel current_pixel;
-            current_pixel = src[RIDX(i-1, j-1, dim)]);
-            unsigned short pixels[4] = {current_pixel->red,current_pixel->green,current_pixel->blue,current_pixel->alpha};
-            __m128i pixel_sum //perform the vector add then move onto the next pixel
-            accumulate_sum(&sum, src[RIDX(i-1, j, dim)]);
-            accumulate_sum(&sum, src[RIDX(i-1, j+1, dim)]);
-            accumulate_sum(&sum, src[RIDX(i+1, j-1, dim)]);
-            accumulate_sum(&sum, src[RIDX(i+1, j, dim)]);
-            accumulate_sum(&sum, src[RIDX(i+1, j+1, dim)]);
-            accumulate_sum(&sum, src[RIDX(i, j+1, dim)]);
-            accumulate_sum(&sum, src[RIDX(i, j-1, dim)]);
-            accumulate_sum(&sum, src[RIDX(i, j, dim)]);
-            
-            //extract the sum from the vector operation
-            sum->red, sum->green, sum->blue, sum->alpha += (int) p.red;
-            sum->green += (int) p.green;
-            sum->blue += (int) p.blue;
-            sum->alpha += (int) p.alpha;
-            initialize_pixel_sum(&sum);
+        for (int j = 1; j < (dim-1); j+=4) {
+            //__m256i pixelsums = _mm256_setzero_si256(); //declare the partial sums as a vector
+            __m128i p1 = _mm_loadu_si128((__m128i*) &src[RIDX(i-1, j-1, dim)]);
+            __m128i p2 = _mm_loadu_si128((__m128i*) &src[RIDX(i-1, j, dim)]);
+            __m128i p3 = _mm_loadu_si128((__m128i*) &src[RIDX(i-1, j+1, dim)]);
+            __m128i p4 = _mm_loadu_si128((__m128i*) &src[RIDX(i, j-1, dim)]);
+            __m128i p5 = _mm_loadu_si128((__m128i*) &src[RIDX(i, j+1, dim)]);
+            __m128i p6 = _mm_loadu_si128((__m128i*) &src[RIDX(i, j, dim)]);
+            __m128i p7 = _mm_loadu_si128((__m128i*) &src[RIDX(i+1, j+1, dim)]);
+            __m128i p8 = _mm_loadu_si128((__m128i*) &src[RIDX(i+1, j-1, dim)]);
+            __m128i p9 = _mm_loadu_si128((__m128i*) &src[RIDX(i+1, j, dim)]);
+            __m256i pi1 = _mm256_cvtepu8_epi16(p1);
+            __m256i pi2 = _mm256_cvtepu8_epi16(p2);
+            __m256i pi3 = _mm256_cvtepu8_epi16(p3);
+            __m256i pi4 = _mm256_cvtepu8_epi16(p4);
+            __m256i pi5 = _mm256_cvtepu8_epi16(p5);
+            __m256i pi6 = _mm256_cvtepu8_epi16(p6);
+            __m256i pi7 = _mm256_cvtepu8_epi16(p7);
+            __m256i pi8 = _mm256_cvtepu8_epi16(p8);
+            __m256i pi9 = _mm256_cvtepu8_epi16(p9);
+            __m256i add1 = _mm256_add_epi16(pi1, pi2);
+            __m256i add2 = _mm256_add_epi16(pi3, pi4);
+            __m256i add3 = _mm256_add_epi16(pi5, pi6);
+            __m256i add4 = _mm256_add_epi16(pi7, pi8);
+            add1 = _mm256_add_epi16(add1, pi9);
+            add2 = _mm256_add_epi16(add2, add3);
+            add1 = _mm256_add_epi16(add4, add1);
+            add1 = _mm256_add_epi16(add1, add2);
 
-            current_pixel.red = (unsigned short) (sum.red/9);
-            current_pixel.green = (unsigned short) (sum.green/9);
-            current_pixel.blue = (unsigned short) (sum.blue/9);
-            current_pixel.alpha = (unsigned short) (sum.alpha/9);
-            dst[RIDX(i, j, dim)] = current_pixel;
+            //pixelsums = _mm256_add_epi16(pixelsums, add2);
+
+
+            unsigned short extracted_sum[16]; //declare extraction array
+            _mm256_storeu_si256((__m256i* ) &extracted_sum, add1); //extract
+            pixel a;
+            a.red = (extracted_sum[0]*7282) >>16;
+            a.green = (extracted_sum[1]*7282) >>16;
+            a.blue = (extracted_sum[2]*7282) >>16;
+            a.alpha = (extracted_sum[3]*7282) >>16;
+            dst[RIDX(i, j, dim)] = a;
+
+            pixel b;
+            b.red = (extracted_sum[4]*7282) >>16;
+            b.green = (extracted_sum[5]*7282) >>16;
+            b.blue = (extracted_sum[6]*7282) >>16;
+            b.alpha = (extracted_sum[7]*7282) >>16;
+            dst[RIDX(i, j+1, dim)] = b;
+
+            pixel c;
+            c.red = (extracted_sum[8]*7282) >>16;
+            c.green = (extracted_sum[9]*7282) >>16;
+            c.blue = (extracted_sum[10]*7282) >>16;
+            c.alpha = (extracted_sum[11]*7282) >>16;
+            dst[RIDX(i, j+2, dim)] = c;
+
+            pixel d;
+            d.red = (extracted_sum[12] * 7282) >>16;
+            d.green = (extracted_sum[13] *7282) >>16;
+            d.blue = (extracted_sum[14]*7282) >>16;
+            d.alpha = (extracted_sum[15]*7282) >>16;
+            dst[RIDX(i, j+3, dim)] = d;
         }
     }
+
+    //deal with leftovers
     for (int j = 0; j<dim; ++j) {
         dst[RIDX(0,j, dim)] = avg(dim, 0, j, src); 
         dst[RIDX(dim-1,j, dim)] = avg(dim, dim-1, j, src);
@@ -186,6 +259,7 @@ void step3(int dim, pixel *src, pixel *dst) {
         dst[RIDX(j,dim-1, dim)] = avg(dim, j, dim-1, src);         
     }
 }
+
 /*********************************************************************
  * register_smooth_functions - Register all of your different versions
  *     of the smooth function by calling the add_smooth_function() for
@@ -199,4 +273,5 @@ void register_smooth_functions() {
     add_smooth_function(&another_smooth, another_smooth_descr);
     add_smooth_function(&step1, step1_descr);
     add_smooth_function(&step3, step3_descr);
+    add_smooth_function(&step4a, step4a_descr);
 }
