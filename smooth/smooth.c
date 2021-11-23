@@ -259,6 +259,90 @@ void step4a(int dim, pixel *src, pixel *dst) {
         dst[RIDX(j,dim-1, dim)] = avg(dim, j, dim-1, src);         
     }
 }
+char step4ab_descr[] = "step4a and b: add 3 at a time and use vector division";
+void step4ab(int dim, pixel *src, pixel *dst) {
+    //unsigned short sum[4] = {0,0,0,0};
+    for (int i = 1; i < (dim-1); i++) {
+        for (int j = 1; j < (dim-1); j+=4) {
+            //__m256i pixelsums = _mm256_setzero_si256(); //declare the partial sums as a vector
+            __m128i p1 = _mm_loadu_si128((__m128i*) &src[RIDX(i-1, j-1, dim)]);
+            __m128i p2 = _mm_loadu_si128((__m128i*) &src[RIDX(i-1, j, dim)]);
+            __m128i p3 = _mm_loadu_si128((__m128i*) &src[RIDX(i-1, j+1, dim)]);
+            __m128i p4 = _mm_loadu_si128((__m128i*) &src[RIDX(i, j-1, dim)]);
+            __m128i p5 = _mm_loadu_si128((__m128i*) &src[RIDX(i, j+1, dim)]);
+            __m128i p6 = _mm_loadu_si128((__m128i*) &src[RIDX(i, j, dim)]);
+            __m128i p7 = _mm_loadu_si128((__m128i*) &src[RIDX(i+1, j+1, dim)]);
+            __m128i p8 = _mm_loadu_si128((__m128i*) &src[RIDX(i+1, j-1, dim)]);
+            __m128i p9 = _mm_loadu_si128((__m128i*) &src[RIDX(i+1, j, dim)]);
+            __m256i pi1 = _mm256_cvtepu8_epi16(p1);
+            __m256i pi2 = _mm256_cvtepu8_epi16(p2);
+            __m256i pi3 = _mm256_cvtepu8_epi16(p3);
+            __m256i pi4 = _mm256_cvtepu8_epi16(p4);
+            __m256i pi5 = _mm256_cvtepu8_epi16(p5);
+            __m256i pi6 = _mm256_cvtepu8_epi16(p6);
+            __m256i pi7 = _mm256_cvtepu8_epi16(p7);
+            __m256i pi8 = _mm256_cvtepu8_epi16(p8);
+            __m256i pi9 = _mm256_cvtepu8_epi16(p9);
+            __m256i add1 = _mm256_add_epi16(pi1, pi2);
+            __m256i add2 = _mm256_add_epi16(pi3, pi4);
+            __m256i add3 = _mm256_add_epi16(pi5, pi6);
+            __m256i add4 = _mm256_add_epi16(pi7, pi8);
+            add1 = _mm256_add_epi16(add1, pi9);
+            add2 = _mm256_add_epi16(add2, add3);
+            add1 = _mm256_add_epi16(add4, add1);
+            add1 = _mm256_add_epi16(add1, add2);
+
+            __m256i all7282 = _mm256_set1_epi16(7282);
+            __m256i dividedvals = _mm256_mulhi_epi16(add1, all7282);
+            __m256i reverse = _mm256_permute2x128_si256(dividedvals,dividedvals,0x21);
+            __m256i div256 = _mm256_packus_epi16(dividedvals, reverse);
+            __m128i first = _mm256_extracti128_si256(div256, 0);
+
+
+        
+            //pixelsums = _mm256_add_epi16(pixelsums, add2);
+
+
+            unsigned char extracted_sum[16]; //declare extraction array
+            _mm_storeu_si128((__m128i* ) &extracted_sum, first); //extract
+            pixel a;
+            a.red = (extracted_sum[0]);
+            a.green = (extracted_sum[1]);
+            a.blue = (extracted_sum[2]);
+            a.alpha = (extracted_sum[3]);
+            dst[RIDX(i, j, dim)] = a;
+
+            pixel b;
+            b.red = (extracted_sum[4]);
+            b.green = (extracted_sum[5]);
+            b.blue = (extracted_sum[6]);
+            b.alpha = (extracted_sum[7]);
+            dst[RIDX(i, j+1, dim)] = b;
+
+            pixel c;
+            c.red = (extracted_sum[8]);
+            c.green = (extracted_sum[9]);
+            c.blue = (extracted_sum[10]);
+            c.alpha = (extracted_sum[11]);
+            dst[RIDX(i, j+2, dim)] = c;
+
+            pixel d;
+            d.red = (extracted_sum[12]);
+            d.green = (extracted_sum[13]);
+            d.blue = (extracted_sum[14]);
+            d.alpha = (extracted_sum[15]);
+            dst[RIDX(i, j+3, dim)] = d;
+        }
+    }
+
+    //deal with leftovers
+    for (int j = 0; j<dim; ++j) {
+        dst[RIDX(0,j, dim)] = avg(dim, 0, j, src); 
+        dst[RIDX(dim-1,j, dim)] = avg(dim, dim-1, j, src);
+        dst[RIDX(j,0, dim)] = avg(dim, j, 0, src); 
+        dst[RIDX(j,dim-1, dim)] = avg(dim, j, dim-1, src);         
+    }
+}
 
 /*********************************************************************
  * register_smooth_functions - Register all of your different versions
@@ -274,4 +358,5 @@ void register_smooth_functions() {
     add_smooth_function(&step1, step1_descr);
     add_smooth_function(&step3, step3_descr);
     add_smooth_function(&step4a, step4a_descr);
+    add_smooth_function(&step4ab, step4ab_descr);
 }
